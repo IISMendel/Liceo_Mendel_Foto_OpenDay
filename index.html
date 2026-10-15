@@ -15,6 +15,7 @@
   html,body{width:100%;height:100%;overflow:hidden;background:#04110a;color:#fff;
     font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;cursor:none}
   body.mostra-cursore{cursor:default}
+  body.mostra-cursore .foto{cursor:pointer}
 
   /* ---------- sfondo sfocato ---------- */
   .sfondo{position:fixed;inset:-8%;background-size:cover;background-position:center;
@@ -97,6 +98,7 @@
   <div class="slogan">Coltiva il tuo futuro.</div>
   <button id="btnInizio" type="button">Avvia la presentazione</button>
   <div class="aiuto">Un clic attiva musica e schermo intero.<br>
+    Durante il vortice puoi <b>cliccare una foto</b> per fermarti su quella.<br>
     Tasti: <b>F</b> schermo intero · <b>M</b> musica sì/no · <b>N</b> brano successivo</div>
   <div class="team">Team Digitale</div>
 </div>
@@ -108,13 +110,13 @@
    IMPOSTAZIONI  (modificabili)
    ===================================================================== */
 const CFG = {
-  giraMin: 1.6,     // secondi minimi di vortice veloce prima dello stop
-  giraMax: 2.6,     // (si aggiungono 0-1,5 s per far arrivare la foto giusta davanti)
+  giraMin: 1.1,     // secondi minimi di vortice veloce prima dello stop
+  giraMax: 1.6,     // (la foto giusta viene portata davanti con una piccola correzione dolce)
   resta:   4.5,     // secondi in cui la foto resta a tutto schermo
   frena:   1.0,    // durata della frenata del vortice
   zoomIn:  1.0,    // durata dell'ingrandimento
   zoomOut: 0.9,     // durata del ritorno nel vortice
-  riparte: 0.9,     // durata della ripartenza
+  riparte: 0.7,     // durata della ripartenza
   velocita: 3.1,    // velocità del vortice (radianti/secondo): più alto = più veloce
   sfocaturaMax: 1.6,// sfocatura da movimento (px) alla massima velocità
   volume: 0.65
@@ -207,7 +209,7 @@ const carte = FOTO.map((p,i) => {
   const u = (perm[i]+0.5)/N;                         // 0 = in alto, 1 = in basso
   return { el, i, u, th0: i*2.399963 + rnd()*0.25,   // angolo di partenza (angolo aureo)
            k: 0.7 + 0.6*u,                           // più in basso = gira più veloce
-           ph: rnd()*TAU };
+           ph: rnd()*TAU, off: 0 };
 });
 
 let W=innerWidth, H=innerHeight, CW=0, CH=0;
@@ -224,7 +226,7 @@ function disegna(phi, vel){
   const cx=W/2, cy=H/2, F=W*1.1;
   const Rmax=W*0.52, Rmin=W*0.15, hs=H*0.40;
   for (const c of carte){
-    const th = c.th0 + c.k*phi;
+    const th = c.th0 + c.off + c.k*phi;
     const r = Rmax - (Rmax-Rmin)*Math.pow(c.u,0.9);
     const sn = Math.sin(th), cs = Math.cos(th);
     const z = r*cs;
@@ -342,11 +344,17 @@ function nascondiDida(){ didascalia.classList.remove('on'); ombra.classList.remo
 /* ---------- macchina a stati ---------- */
 const ease3 = p => 1-Math.pow(1-p,3);
 const smooth = p => p*p*(3-2*p);
+let frenaT=1.0;
 let st='idle', t=0, phi=0, omega=CFG.velocita*0.5, cur=0, spinDur=8, delta=0, phi0=0, clock=0, prevPsi=null;
 let avviato=false;
 const START = Math.min(N-1, Math.max(0, parseInt(params.get('start')||'0')||0));
 
-function scegliSpin(){ spinDur = (CFG.giraMin + Math.random()*(CFG.giraMax-CFG.giraMin)); }
+let primo = true;
+function scegliSpin(){
+  if (primo){ spinDur = 0.6; primo = false; return; }   // il primo stop (il logo) arriva subito
+  spinDur = (CFG.giraMin + Math.random()*(CFG.giraMax-CFG.giraMin));
+}
+const wrapPi = x => ((x % TAU) + TAU + Math.PI) % TAU - Math.PI;
 
 function nuovoGiro(){
   st='spin'; t=0; prevPsi=null; scegliSpin();
@@ -363,25 +371,23 @@ function aggiorna(dt){
     case 'spin': {
       omega = CFG.velocita*(1 + 0.03*Math.sin(clock*1.3));
       phi += omega*dt;
+      const c = carte[cur], d0 = omega*CFG.frena/3;
+      // piccola correzione dolce dell'angolo della foto in programma: così arriva davanti proprio a fine frenata, senza attese
+      const resto = Math.max(0, spinDur - t);
+      const thFin = c.th0 + c.off + c.k*(phi + omega*resto + d0);
+      c.off += wrapPi(-thFin) * Math.min(1, dt*2.6);
       if (t >= spinDur){
-        // aspetta il momento giusto: la foto in programma deve arrivare davanti proprio alla fine della frenata
-        const c = carte[cur], d0 = omega*CFG.frena/3;
-        const psi = ((c.th0 + c.k*(phi + d0)) % TAU + TAU) % TAU;
-        const psiC = psi > Math.PI ? psi - TAU : psi;        // -π..π
-        if (prevPsi !== null && prevPsi < 0 && psiC >= 0 || t > spinDur + 2.2){
-          const thNow = c.th0 + c.k*phi;
-          const m = Math.round((thNow + c.k*d0)/TAU);
-          delta = (m*TAU - thNow)/c.k;
-          if (delta < d0*0.5) delta = ((Math.ceil((thNow + c.k*d0*0.5)/TAU))*TAU - thNow)/c.k;
-          phi0 = phi; st='frena'; t=0;
-        }
-        prevPsi = psiC;
+        const thNow = c.th0 + c.off + c.k*phi;
+        const m = Math.round((thNow + c.k*d0)/TAU);
+        delta = (m*TAU - thNow)/c.k;
+        if (delta < d0*0.5) delta = ((Math.ceil((thNow + c.k*d0*0.5)/TAU))*TAU - thNow)/c.k;
+        frenaT = CFG.frena; phi0 = phi; st='frena'; t=0;
       }
       break; }
     case 'frena': {
-      const p = Math.min(1, t/CFG.frena);
+      const p = Math.min(1, t/frenaT);
       phi = phi0 + delta*ease3(p);
-      omega = delta*3*Math.pow(1-p,2)/CFG.frena;
+      omega = delta*3*Math.pow(1-p,2)/frenaT;
       if (p >= 1){ omega=0; st='zin'; t=0; apriZoom(cur); }
       break; }
     case 'zin':
@@ -446,6 +452,15 @@ addEventListener('keydown', e => {
   if (k==='f') schermoIntero();
   if (k==='m'){ mute=!mute; audio.muted=mute; }
   if (k==='n'){ bi++; suona(); }
+});
+
+/* ---------- clic su una foto: il vortice si ferma proprio su quella ---------- */
+scena.addEventListener('click', e => {
+  if (!avviato || st!=='spin') return;
+  const el = e.target.closest('.foto'); if (!el) return;
+  const i = carte.findIndex(c => c.el === el); if (i < 0) return;
+  cur = i; precarica(i); cambiaSfondo(i);
+  spinDur = t + 1.0;                // tra circa 1 secondo il vortice si ferma sulla foto cliccata
 });
 let tCursore; addEventListener('mousemove', ()=>{ document.body.classList.add('mostra-cursore'); clearTimeout(tCursore); tCursore=setTimeout(()=>document.body.classList.remove('mostra-cursore'),2200); });
 
