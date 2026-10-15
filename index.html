@@ -16,6 +16,9 @@
     font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;cursor:none}
   body.mostra-cursore{cursor:default}
   body.mostra-cursore .foto{cursor:pointer}
+  body.leggero .foto{box-shadow:0 5px 14px rgba(0,0,0,.45);will-change:auto}
+  body.leggero .sfondo{filter:blur(22px) saturate(1.2) brightness(.5)}
+  body.leggero #zoom .zsfondo{filter:blur(12px) brightness(.62) saturate(1.1)}
   .foto.scelta{border-color:#ffd54f;box-shadow:0 0 0 5px rgba(255,213,79,.9),0 0 46px 12px rgba(255,213,79,.7)}
 
   /* ---------- sfondo sfocato ---------- */
@@ -223,6 +226,8 @@ addEventListener('resize', misure); misure();
 
 /* ---------- disegno del vortice ---------- */
 let stageBlur = -1;
+const LEGGERO = params.has('lite') || (matchMedia('(pointer:coarse)').matches && !params.has('full'));
+if (LEGGERO) document.body.classList.add('leggero');
 function disegna(phi, vel){
   const cx=W/2, cy=H/2, F=W*1.1;
   const Rmax=W*0.52, Rmin=W*0.15, hs=H*0.40;
@@ -243,9 +248,10 @@ function disegna(phi, vel){
     c.el.style.zIndex = Math.round(s*100);
     c._s = s;
   }
+  if (LEGGERO) return;           // telefoni/tablet: nessun filtro sull'intera scena (evita sfarfallii)
   const b = CFG.sfocaturaMax*Math.pow(vel,1.3);
-  const bq = Math.round(b*10)/10;
-  if (bq !== stageBlur){ stageBlur = bq; scena.style.filter = bq>0.15 ? 'blur('+bq+'px)' : 'none'; }
+  const bq = Math.max(0.3, Math.round(b*10)/10);   // il filtro non viene mai tolto: niente "scatti" al momento dello stop
+  if (bq !== stageBlur){ stageBlur = bq; scena.style.filter = 'blur('+bq+'px)'; }
 }
 
 /* ---------- sfondo sfocato che cambia lentamente ---------- */
