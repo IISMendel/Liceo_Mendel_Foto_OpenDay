@@ -16,6 +16,7 @@
     font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;cursor:none}
   body.mostra-cursore{cursor:default}
   body.mostra-cursore .foto{cursor:pointer}
+  .foto.scelta{border-color:#ffd54f;box-shadow:0 0 0 5px rgba(255,213,79,.9),0 0 46px 12px rgba(255,213,79,.7)}
 
   /* ---------- sfondo sfocato ---------- */
   .sfondo{position:fixed;inset:-8%;background-size:cover;background-position:center;
@@ -117,8 +118,8 @@ const CFG = {
   zoomIn:  1.0,    // durata dell'ingrandimento
   zoomOut: 0.9,     // durata del ritorno nel vortice
   riparte: 0.7,     // durata della ripartenza
-  velocita: 3.1,    // velocità del vortice (radianti/secondo): più alto = più veloce
-  sfocaturaMax: 1.6,// sfocatura da movimento (px) alla massima velocità
+  velocita: 2.0,    // velocità del vortice (radianti/secondo): più alto = più veloce
+  sfocaturaMax: 1.2,// sfocatura da movimento (px) alla massima velocità
   volume: 0.65
 };
 const BRANI = ['musica/brano1.mp3','musica/brano2.mp3','musica/brano3.mp3'];
@@ -332,6 +333,7 @@ function fineZoom(i){
   zi.getAnimations().forEach(a=>a.cancel());
   zoom.style.display='none';
   carte[i].el.style.visibility='visible';
+  carte.forEach(c => c.el.classList.remove('scelta'));
 }
 function mostraDida(i){
   const p = FOTO[i];
@@ -349,9 +351,10 @@ let st='idle', t=0, phi=0, omega=CFG.velocita*0.5, cur=0, spinDur=8, delta=0, ph
 let avviato=false;
 const START = Math.min(N-1, Math.max(0, parseInt(params.get('start')||'0')||0));
 
-let primo = true;
+let primo = true, sceltaSubito = false, prossima = null;
 function scegliSpin(){
-  if (primo){ spinDur = 0.6; primo = false; return; }   // il primo stop (il logo) arriva subito
+  if (primo){ spinDur = 0.6; primo = false; return; }
+  if (sceltaSubito){ spinDur = 0.9; sceltaSubito = false; return; }   // il primo stop (il logo) arriva subito
   spinDur = (CFG.giraMin + Math.random()*(CFG.giraMax-CFG.giraMin));
 }
 const wrapPi = x => ((x % TAU) + TAU + Math.PI) % TAU - Math.PI;
@@ -397,7 +400,7 @@ function aggiorna(dt){
       if (t >= CFG.resta){ st='zout'; t=0; nascondiDida(); chiudiZoom(cur); }
       break;
     case 'zout':
-      if (t >= CFG.zoomOut){ fineZoom(cur); cur=(cur+1)%N; st='riparte'; t=0; }
+      if (t >= CFG.zoomOut){ fineZoom(cur); cur = (prossima!==null) ? prossima : (cur+1)%N; prossima=null; st='riparte'; t=0; }
       break;
     case 'riparte': {
       const p = Math.min(1, t/CFG.riparte);
@@ -456,11 +459,14 @@ addEventListener('keydown', e => {
 
 /* ---------- clic su una foto: il vortice si ferma proprio su quella ---------- */
 scena.addEventListener('click', e => {
-  if (!avviato || st!=='spin') return;
+  if (!avviato) return;
   const el = e.target.closest('.foto'); if (!el) return;
-  const i = carte.findIndex(c => c.el === el); if (i < 0) return;
-  cur = i; precarica(i); cambiaSfondo(i);
-  spinDur = t + 1.0;                // tra circa 1 secondo il vortice si ferma sulla foto cliccata
+  const i = carte.findIndex(c => c.el === el); if (i < 0 || i === cur && st!=='spin' && st!=='riparte') return;
+  carte.forEach(c => c.el.classList.remove('scelta'));
+  el.classList.add('scelta'); precarica(i);
+  if (st==='spin'){ cur = i; cambiaSfondo(i); spinDur = t + 1.0; }          // si ferma su questa tra circa 1 secondo
+  else if (st==='riparte'){ cur = i; cambiaSfondo(i); sceltaSubito = true; } // appena riparte, giro brevissimo e stop
+  else { prossima = i; }                                                     // frenata/zoom in corso: sarà la prossima
 });
 let tCursore; addEventListener('mousemove', ()=>{ document.body.classList.add('mostra-cursore'); clearTimeout(tCursore); tCursore=setTimeout(()=>document.body.classList.remove('mostra-cursore'),2200); });
 
