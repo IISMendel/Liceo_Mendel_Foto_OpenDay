@@ -39,7 +39,9 @@
   #zoom .zsfondo{position:absolute;inset:-60px;background-size:cover;background-position:center;
     filter:blur(34px) brightness(.62) saturate(1.15)}
   #zoom .zi{position:absolute;transform-origin:50% 50%;will-change:transform}
-  #zoom .zi img{display:block;width:100%;height:100%;object-fit:cover}
+  #zoom .zi img{position:absolute;left:0;top:0;display:block;width:100%;height:100%;object-fit:cover}
+  #zoom .zi .zt{opacity:0;transition:opacity .45s ease}
+  #zoom .zi .zt.on{opacity:1}
 
   /* ---------- didascalia ---------- */
   #ombra{position:fixed;left:0;right:0;bottom:0;height:46vh;z-index:25;pointer-events:none;opacity:0;
@@ -87,7 +89,7 @@
 
 <div id="scena"></div>
 
-<div id="zoom"><div class="zsfondo"></div><div class="zi"><img alt=""></div></div>
+<div id="zoom"><div class="zsfondo"></div><div class="zi"><img class="zb" alt=""><img class="zt" alt=""></div></div>
 <div id="ombra"></div>
 <div id="didascalia"><div class="tema"></div><div class="testo"></div></div>
 
@@ -189,7 +191,7 @@ if (DEBUG) $('dbg').style.display='block';
 
 const N = FOTO.length;
 const TAU = Math.PI*2;
-const scena = $('scena'), zoom = $('zoom'), zi = zoom.querySelector('.zi'), zimg = zi.querySelector('img'), zsf = zoom.querySelector('.zsfondo');
+const scena = $('scena'), zoom = $('zoom'), zi = zoom.querySelector('.zi'), zb = zi.querySelector('.zb'), zt = zi.querySelector('.zt'), zsf = zoom.querySelector('.zsfondo');
 const didascalia = $('didascalia'), ombra = $('ombra');
 
 /* generatore pseudo-casuale con seme fisso: il vortice è sempre uguale */
@@ -250,8 +252,8 @@ function disegna(phi, vel){
   }
   if (LEGGERO) return;           // telefoni/tablet: nessun filtro sull'intera scena (evita sfarfallii)
   const b = CFG.sfocaturaMax*Math.pow(vel,1.3);
-  const bq = Math.max(0.3, Math.round(b*10)/10);   // il filtro non viene mai tolto: niente "scatti" al momento dello stop
-  if (bq !== stageBlur){ stageBlur = bq; scena.style.filter = 'blur('+bq+'px)'; }
+  const bq = Math.round(b*10)/10;
+  if (bq !== stageBlur){ stageBlur = bq; scena.style.filter = bq>0.15 ? 'blur('+bq+'px)' : 'none'; }
 }
 
 /* ---------- sfondo sfocato che cambia lentamente ---------- */
@@ -268,6 +270,7 @@ const piena = {};   // cache delle foto grandi già caricate
 function precarica(i){
   if (piena[i]) return piena[i];
   const im = new Image(); im.src = 'foto/'+FOTO[i].f;
+  if (im.decode) im.decode().catch(()=>{});
   piena[i] = im; return im;
 }
 function piano(i){
@@ -282,12 +285,20 @@ function piano(i){
 function preparaZoom(i){
   const p = FOTO[i], pn = piano(i);
   const im = precarica(i);
-  zimg.src = (im.complete && im.naturalWidth) ? im.src : 'foto/mini/'+p.f;
-  if (!(im.complete && im.naturalWidth)) im.addEventListener('load', ()=>{ if (cur===i) zimg.src = im.src; }, {once:true});
+  // prima la miniatura (gia' decodificata, nessun lampo), poi la foto grande in dissolvenza appena pronta
+  zt.style.transition='none'; zt.classList.remove('on'); zt.removeAttribute('src'); void zt.offsetWidth; zt.style.transition='';
+  zb.src = 'foto/mini/'+p.f;
+  const mostraGrande = () => {
+    if (cur!==i) return;
+    zt.src = im.src;
+    const ok = () => { if (cur===i) zt.classList.add('on'); };
+    (zt.decode ? zt.decode() : Promise.resolve()).then(ok, ok);
+  };
+  if (im.complete && im.naturalWidth) mostraGrande(); else im.addEventListener('load', mostraGrande, {once:true});
   if (p.bg){ zsf.style.backgroundImage = p.bg; zsf.style.filter='none'; }
   else { zsf.style.backgroundImage = 'url("foto/mini/'+p.f+'")'; zsf.style.filter=''; }
   zi.getAnimations().forEach(a=>a.cancel());
-  zimg.style.objectPosition = '50% '+(p.py!=null?p.py:50)+'%';
+  zb.style.objectPosition = zt.style.objectPosition = '50% '+(p.py!=null?p.py:50)+'%';
   zi.style.transform = 'none';
   let kb = null;
   if (pn.mod === 'cover'){
@@ -297,7 +308,7 @@ function preparaZoom(i){
     zsf.style.display='none';
     const hpx = p.h*(W/p.w), over = Math.max(0, hpx-H);
     Object.assign(zi.style,{left:'0',top:'0',width:'100%',height:(hpx/H*100)+'%'});
-    zimg.style.objectPosition='50% 50%';
+    zb.style.objectPosition = zt.style.objectPosition = '50% 50%';
     const f0 = -(over*0.5)/hpx*100, f1 = -(over*0.82)/hpx*100;
     zi.style.transform = 'translateY('+f0+'%)';
     kb = [{transform:'translateY('+f0+'%)'},{transform:'translateY('+f1+'%)'}];
