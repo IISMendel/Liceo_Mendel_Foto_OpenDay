@@ -78,6 +78,10 @@
   #inizio .aiuto{max-width:60ch;font-size:clamp(.8rem,1.05vw,1.05rem);line-height:1.5;color:rgba(255,255,255,.66)}
   #inizio .team{position:absolute;bottom:2.6vh;font-size:.85rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45)}
 
+  #pausa{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:flex;align-items:center;gap:14px;padding:22px 34px;border-radius:18px;background:rgba(0,0,0,.55);color:#fff;font-size:clamp(1.2rem,2vw,2rem);font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:0;pointer-events:none;transition:opacity .25s ease}
+  #pausa.on{opacity:1}
+  #pausa i{display:block;width:12px;height:38px;border-radius:3px;background:#fff}
+  #pausa span{margin-left:10px}
   #dbg{position:fixed;left:8px;top:8px;z-index:99;font:12px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.6);padding:4px 7px;display:none}
 </style>
 </head>
@@ -105,10 +109,11 @@
   <button id="btnInizio" type="button">Avvia la presentazione</button>
   <div class="aiuto">Un clic attiva musica e schermo intero.<br>
     Durante il vortice puoi <b>cliccare una foto</b> per fermarti su quella.<br>
-    Tasti: <b>F</b> schermo intero · <b>M</b> musica sì/no · <b>N</b> brano successivo</div>
+    Tasti: <b>Spazio</b> pausa · <b>F</b> schermo intero · <b>M</b> musica sì/no · <b>N</b> brano successivo</div>
   <div class="team">Team Digitale</div>
 </div>
 
+<div id="pausa"><i></i><i></i><span>In pausa</span></div>
 <div id="dbg"></div>
 
 <script>
@@ -139,7 +144,7 @@ const BRANI = ['musica/brano1.mp3','musica/brano2.mp3','musica/brano3.mp3'];
 const FOTO = [
   {"f": "logo.png", "w": 1400, "h": 1400, "g": "Il nostro liceo", "c": "Benvenuti al Liceo G. Mendel di Villa Cortese", "m": "contain", "bg": "radial-gradient(circle at 50% 45%, #2e7d32 0%, #12451a 65%, #07200b 100%)", "fh": 0.86, "dy": 0.04},
   {"f": "euro.jpg", "w": 1044, "h": 783, "g": "Il nostro liceo", "c": "Una scuola aperta all'Europa e al mondo"},
-  {"f": "mendel1.jpg", "w": 854, "h": 439, "g": "Il nostro liceo", "c": "Il nostro liceo porta il nome di Gregor Mendel, il padre della genetica"},
+  {"f": "mendel1.jpg", "w": 2390, "h": 1792, "g": "Il nostro liceo", "c": "Il nostro liceo porta il nome di Gregor Mendel, il padre della genetica"},
   {"f": "mendel2.jpg", "w": 1214, "h": 765, "g": "Il nostro liceo", "c": "Un solo Mendel: Liceo tecnologico e professionale di giorno, Corsi IDA (Istruzione degli Adulti) la sera"},
   {"f": "azienda_titolo.jpg", "w": 1920, "h": 1080, "g": "L'azienda agraria", "c": "Questa è la nostra azienda agraria"},
   {"f": "azienda.jpg", "w": 552, "h": 382, "g": "L'azienda agraria", "c": "Il frutteto: qui si impara facendo"},
@@ -427,9 +432,20 @@ function aggiorna(dt){
   }
 }
 
-let last = 0;
+let last = 0, pausa = false, animPausate = [];
+function vaiInPausa(p){
+  if (!avviato || p === pausa) return;
+  pausa = p; $('pausa').classList.toggle('on', pausa);
+  if (pausa){
+    animPausate = [...zoom.getAnimations(), ...zi.getAnimations()].filter(a => a.playState === 'running');
+    animPausate.forEach(a => a.pause()); audio.pause();
+  } else {
+    animPausate.forEach(a => a.play()); animPausate = [];
+    if (!mute) audio.play().catch(()=>{});
+  }
+}
 function frame(ts){
-  const dt = Math.min(0.25, (ts-last)/1000 || 0.016) * SPEED; last = ts;
+  const dt = pausa ? 0 : Math.min(0.25, (ts-last)/1000 || 0.016) * SPEED; last = ts;
   aggiorna(dt);
   disegna(phi, Math.min(1, Math.abs(omega)/CFG.velocita));
   if (DEBUG) $('dbg').textContent = st+' t='+t.toFixed(1)+' cur='+cur+' '+FOTO[cur].f+' '+piano(cur).mod+' omega='+omega.toFixed(2);
@@ -469,6 +485,7 @@ $('btnInizio').addEventListener('click', avvia);
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (!avviato && (k==='enter' || k===' ')) { avvia(); e.preventDefault(); return; }
+  if (k===' ' || k==='spacebar'){ e.preventDefault(); if (!e.repeat) vaiInPausa(!pausa); return; }
   if (k==='f') schermoIntero();
   if (k==='m'){ mute=!mute; audio.muted=mute; }
   if (k==='n'){ bi++; suona(); }
@@ -476,7 +493,7 @@ addEventListener('keydown', e => {
 
 /* ---------- clic su una foto: il vortice si ferma proprio su quella ---------- */
 addEventListener('pointerdown', e => {
-  if (!avviato) return;
+  if (!avviato || pausa) return;
   // le foto si muovono: si usa il momento della pressione (non il "clic" completo) e la foto più in alto sotto il puntatore
   let el = null;
   for (const x of document.elementsFromPoint(e.clientX, e.clientY)){ const f = x.closest && x.closest('.foto'); if (f && f.style.visibility!=='hidden'){ el = f; break; } }
