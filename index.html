@@ -132,6 +132,8 @@ const CFG = {
   sfocaturaMax: 1.2,// sfocatura da movimento (px) alla massima velocità
   volume: 0.65
 };
+// cambia questo numero quando sostituisci delle foto: obbliga i browser a scaricarle di nuovo
+const VER = '?v=20261022';
 const BRANI = ['musica/brano1.mp3','musica/brano2.mp3','musica/brano3.mp3'];
 
 /* =====================================================================
@@ -215,7 +217,7 @@ for (let i=N-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [perm[i],perm[j]]=[per
 
 const carte = FOTO.map((p,i) => {
   const el = document.createElement('div'); el.className='foto';
-  const im = new Image(); im.src='foto/mini/'+p.f; im.alt=''; im.draggable=false;
+  const im = new Image(); im.src='foto/mini/'+p.f+VER; im.alt=''; im.draggable=false;
   el.appendChild(im); scena.appendChild(el);
   const u = (perm[i]+0.5)/N;                         // 0 = in alto, 1 = in basso
   return { el, i, u, th0: i*2.399963 + rnd()*0.25,   // angolo di partenza (angolo aureo)
@@ -265,7 +267,7 @@ function disegna(phi, vel){
 let sfAttivo = 0;
 function cambiaSfondo(i){
   const a = sfAttivo ? $('sfA') : $('sfB'), b = sfAttivo ? $('sfB') : $('sfA');
-  a.style.backgroundImage = 'url("foto/mini/'+FOTO[i].f+'")';
+  a.style.backgroundImage = 'url("foto/mini/'+FOTO[i].f+VER+'")';
   a.classList.add('on'); b.classList.remove('on');
   sfAttivo = 1 - sfAttivo;
 }
@@ -274,7 +276,7 @@ function cambiaSfondo(i){
 const piena = {};   // cache delle foto grandi già caricate
 function precarica(i){
   if (piena[i]) return piena[i];
-  const im = new Image(); im.src = 'foto/'+FOTO[i].f;
+  const im = new Image(); im.src = 'foto/'+FOTO[i].f+VER;
   if (im.decode) im.decode().catch(()=>{});
   piena[i] = im; return im;
 }
@@ -292,7 +294,7 @@ function preparaZoom(i){
   const im = precarica(i);
   // prima la miniatura (gia' decodificata, nessun lampo), poi la foto grande in dissolvenza appena pronta
   zt.style.transition='none'; zt.classList.remove('on'); zt.removeAttribute('src'); void zt.offsetWidth; zt.style.transition='';
-  zb.src = 'foto/mini/'+p.f;
+  zb.src = 'foto/mini/'+p.f+VER;
   const mostraGrande = () => {
     if (cur!==i) return;
     zt.src = im.src;
@@ -301,7 +303,7 @@ function preparaZoom(i){
   };
   if (im.complete && im.naturalWidth) mostraGrande(); else im.addEventListener('load', mostraGrande, {once:true});
   if (p.bg){ zsf.style.backgroundImage = p.bg; zsf.style.filter='none'; }
-  else { zsf.style.backgroundImage = 'url("foto/mini/'+p.f+'")'; zsf.style.filter=''; }
+  else { zsf.style.backgroundImage = 'url("foto/mini/'+p.f+VER+'")'; zsf.style.filter=''; }
   zi.getAnimations().forEach(a=>a.cancel());
   zb.style.objectPosition = zt.style.objectPosition = '50% '+(p.py!=null?p.py:50)+'%';
   zi.style.transform = 'none';
