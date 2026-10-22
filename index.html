@@ -144,7 +144,7 @@ const BRANI = ['musica/brano1.mp3','musica/brano2.mp3','musica/brano3.mp3'];
    fh = quanta altezza occupa se mostrata intera (1 = tutta)  ·  dy = la sposta verso l'alto
    ===================================================================== */
 const FOTO = [
-  {"f": "logo.png", "w": 1400, "h": 1400, "g": "Il nostro liceo", "c": "Benvenuti al Liceo G. Mendel di Villa Cortese", "m": "contain", "bg": "radial-gradient(circle at 50% 45%, #2e7d32 0%, #12451a 65%, #07200b 100%)", "fh": 0.86, "dy": 0.04},
+  {"f": "logo.png", "w": 1400, "h": 1399, "g": "Il nostro liceo", "c": "Benvenuti al Liceo G. Mendel di Villa Cortese", "m": "contain", "bg": "radial-gradient(circle at 50% 45%, #2e7d32 0%, #12451a 65%, #07200b 100%)", "fh": 0.76, "dy": 0.05},
   {"f": "euro.jpg", "w": 1044, "h": 783, "g": "Il nostro liceo", "c": "Una scuola aperta all'Europa e al mondo"},
   {"f": "mendel1.jpg", "w": 2390, "h": 1792, "g": "Il nostro liceo", "c": "Il nostro liceo porta il nome di Gregor Mendel, il padre della genetica"},
   {"f": "mendel2.jpg", "w": 1214, "h": 765, "g": "Il nostro liceo", "c": "Un solo Mendel: Liceo tecnologico e professionale di giorno, Corsi IDA (Istruzione degli Adulti) la sera"},
@@ -295,6 +295,7 @@ function preparaZoom(i){
   // prima la miniatura (gia' decodificata, nessun lampo), poi la foto grande in dissolvenza appena pronta
   zt.style.transition='none'; zt.classList.remove('on'); zt.removeAttribute('src'); void zt.offsetWidth; zt.style.transition='';
   zb.src = 'foto/mini/'+p.f+VER;
+  zb.style.display = p.bg ? 'none' : '';      // logo trasparente: niente miniatura sotto, altrimenti si vedrebbe un quadrato bianco
   const mostraGrande = () => {
     if (cur!==i) return;
     zt.src = im.src;
